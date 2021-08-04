@@ -189,6 +189,7 @@ private[kinesis] case class KinesisReader(
       if (returnedToken != null) {
         nextToken = returnedToken
         listShardsRequest.setNextToken(nextToken)
+        listShardsRequest.setStreamName(null) // paging only works without streamName
       }
     } while (!nextToken.isEmpty)
 
