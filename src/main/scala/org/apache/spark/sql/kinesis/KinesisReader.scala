@@ -171,7 +171,6 @@ private[kinesis] case class KinesisReader(
   }
 
   private def listShards(): Seq[Shard] = {
-    var nextToken = ""
     var returnedToken = ""
     val shards = new ArrayList[Shard]()
     val listShardsRequest = new ListShardsRequest
@@ -187,10 +186,10 @@ private[kinesis] case class KinesisReader(
       shards.addAll(listShardsResult.getShards)
       returnedToken = listShardsResult.getNextToken()
       if (returnedToken != null) {
-        nextToken = returnedToken
-        listShardsRequest.setNextToken(nextToken)
+        listShardsRequest.setNextToken(returnedToken)
+        listShardsRequest.setStreamName(null) // paging only works without streamName
       }
-    } while (!nextToken.isEmpty)
+    } while (returnedToken != null && !returnedToken.isEmpty)
 
     shards.asScala.toSeq
   }
