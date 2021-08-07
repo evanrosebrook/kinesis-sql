@@ -16,11 +16,12 @@
  */
 package org.apache.spark.sql.kinesis
 
+import com.amazonaws.services.kinesis.AmazonKinesisClient
 import com.amazonaws.services.kinesis.model.{GetRecordsResult, Record}
+
 import java.io.Serializable
 import java.util.Locale
 import scala.collection.JavaConverters._
-
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -107,7 +108,7 @@ private[kinesis] class KinesisSourceRDD(
     val kinesisReader = new KinesisReader(
       sourceOptions,
       streamName,
-      kinesisCredsProvider,
+      () => new AmazonKinesisClient(kinesisCredsProvider.provider),
       endpointUrl
     )
 

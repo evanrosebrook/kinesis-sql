@@ -18,15 +18,19 @@
 
 package org.apache.spark.sql.kinesis
 
-import scala.util.Try
-
-import org.scalatest.PrivateMethodTester
-
+import com.amazonaws.services.kinesis.model.{ListShardsRequest, ListShardsResult}
+import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
 import org.apache.spark.SparkException
 import org.apache.spark.sql.kinesis.KinesisTestUtils.{envVarNameForEnablingTests, shouldRunTests}
 import org.apache.spark.sql.test.SharedSparkSession
+import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.when
+import org.scalatest.PrivateMethodTester
+import org.scalatest.mock.MockitoSugar
 
-class KinesisReaderSuite extends SharedSparkSession with PrivateMethodTester {
+import scala.util.Try
+
+class KinesisReaderSuite extends SharedSparkSession with PrivateMethodTester with MockitoSugar {
 
   protected var testUtils: KinesisTestUtils = _
 
@@ -45,7 +49,7 @@ class KinesisReaderSuite extends SharedSparkSession with PrivateMethodTester {
         new KinesisReader(
           Map.empty[String, String],
           "Test",
-          InstanceProfileCredentials,
+          () => new AmazonKinesisClient(InstanceProfileCredentials.provider),
           KinesisTestUtils.endpointUrl
         )
       kinesisReader.getShards()
@@ -57,7 +61,7 @@ class KinesisReaderSuite extends SharedSparkSession with PrivateMethodTester {
       val kinesisReader = new KinesisReader(
         Map.empty[ String, String],
         "Test",
-        STSCredentials("role-arn", "session-name"),
+        () => new AmazonKinesisClient(STSCredentials("role-arn", "session-name").provider),
         KinesisTestUtils.endpointUrl)
       kinesisReader.getShards()
     }
@@ -69,11 +73,27 @@ class KinesisReaderSuite extends SharedSparkSession with PrivateMethodTester {
         new KinesisReader(
           Map.empty[String, String],
           "Test",
-          BasicCredentials("access-key", "secret-key"),
+          () => new AmazonKinesisClient(BasicCredentials("access-key", "secret-key").provider),
           KinesisTestUtils.endpointUrl
         )
       kinesisReader.getShards()
     }
+  }
+
+  test("Should page using nexToken without streamName") {
+
+    val clientMock = mock[AmazonKinesis]
+
+    when(clientMock.listShards(any[ListShardsRequest])).thenReturn(new ListShardsResult)
+    
+    val kinesisReader =
+      new KinesisReader(
+        Map.empty[String, String],
+        "Test",
+        () => clientMock,
+        KinesisTestUtils.endpointUrl
+      )
+    kinesisReader.getShards()
   }
 
   testIfEnabled("Should succeed for valid Credentials") {
@@ -82,10 +102,10 @@ class KinesisReaderSuite extends SharedSparkSession with PrivateMethodTester {
         new KinesisReader(
           Map.empty[String, String],
           "Test",
-          BasicCredentials(
+          () => new AmazonKinesisClient(BasicCredentials(
             KinesisTestUtils.getAWSCredentials().getAWSAccessKeyId,
             KinesisTestUtils.getAWSCredentials().getAWSSecretKey
-          ),
+          ).provider),
           KinesisTestUtils.endpointUrl
         )
       kinesisReader.getShards()
@@ -98,10 +118,10 @@ class KinesisReaderSuite extends SharedSparkSession with PrivateMethodTester {
       new KinesisReader(
         Map.empty[String, String],
         "Test",
-        BasicCredentials(
+        () => new AmazonKinesisClient(BasicCredentials(
           KinesisTestUtils.getAWSCredentials().getAWSAccessKeyId,
           KinesisTestUtils.getAWSCredentials().getAWSSecretKey
-        ),
+        ).provider),
         KinesisTestUtils.endpointUrl
       )
     val shardIterator = kinesisReader.getShardIterator("BAD-SHARD-ID", "LATEST",
@@ -116,10 +136,10 @@ class KinesisReaderSuite extends SharedSparkSession with PrivateMethodTester {
         new KinesisReader(
           Map.empty[String, String],
           "Test",
-          BasicCredentials(
+          () => new AmazonKinesisClient(BasicCredentials(
             KinesisTestUtils.getAWSCredentials().getAWSAccessKeyId,
             KinesisTestUtils.getAWSCredentials().getAWSSecretKey
-          ),
+          ).provider),
           KinesisTestUtils.endpointUrl
         )
       val shardIterator = kinesisReader.getShardIterator("BAD-SHARD-ID", "LATEST",

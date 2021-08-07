@@ -17,14 +17,15 @@
 
 package org.apache.spark.sql.kinesis
 
+import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
+
 import java.io._
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
-
 import com.amazonaws.services.kinesis.model.Record
 import org.apache.hadoop.conf.Configuration
-import scala.collection.parallel.ForkJoinTaskSupport
 
+import scala.collection.parallel.ForkJoinTaskSupport
 import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql._
@@ -68,7 +69,9 @@ private[kinesis] class KinesisSource(
   }
 
   private def kinesisReader: KinesisReader = {
-    new KinesisReader(sourceOptions, streamName, kinesisCredsProvider, endPointURL)
+    val kinesisClient = new AmazonKinesisClient(kinesisCredsProvider.provider)
+    def func: () => AmazonKinesis = () => new AmazonKinesisClient(kinesisCredsProvider.provider)
+    new KinesisReader(sourceOptions, streamName, func, endPointURL)
   }
 
   private var currentShardOffsets: Option[ShardOffsets] = None

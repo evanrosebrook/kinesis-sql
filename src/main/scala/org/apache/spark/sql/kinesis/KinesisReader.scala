@@ -21,16 +21,15 @@ import java.math.BigInteger
 import java.util
 import java.util.{ArrayList, Locale}
 import java.util.concurrent.{Executors, ThreadFactory}
-
 import com.amazonaws.AbortedException
-import com.amazonaws.services.kinesis.AmazonKinesisClient
+import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
 import com.amazonaws.services.kinesis.clientlibrary.types.UserRecord
 import com.amazonaws.services.kinesis.model.{GetRecordsRequest, ListShardsRequest, Shard, _}
+
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 import scala.util.control.NonFatal
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.types._
 import org.apache.spark.util.{ThreadUtils, UninterruptibleThread}
@@ -41,7 +40,7 @@ import org.apache.spark.util.{ThreadUtils, UninterruptibleThread}
 private[kinesis] case class KinesisReader(
     readerOptions: Map[String, String],
     streamName: String,
-    kinesisCredsProvider: SparkAWSCredentials,
+    kinesisClient: () => AmazonKinesis,
     endpointUrl: String
 ) extends Serializable with Logging {
 
@@ -74,11 +73,11 @@ private[kinesis] case class KinesisReader(
 
   private val maxSupportedShardsPerStream = 10000;
 
-  private var _amazonClient: AmazonKinesisClient = null
+  private var _amazonClient: AmazonKinesis = null
 
-  private def getAmazonClient(): AmazonKinesisClient = {
+  protected def getAmazonClient(): AmazonKinesis = {
     if (_amazonClient == null) {
-      _amazonClient = new AmazonKinesisClient(kinesisCredsProvider.provider)
+      _amazonClient = kinesisClient()
       _amazonClient.setEndpoint(endpointUrl)
     }
     _amazonClient
